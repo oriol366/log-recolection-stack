@@ -1,0 +1,61 @@
+services:
+  app:
+    build: 
+      context: ./src
+      dockerfile: Dockerfile
+    container_name: app
+    user: "2111"
+    restart: unless-stopped
+    networks:
+      - app-monitoring
+
+  grafana:
+    image: grafana/grafana:11.0.0
+    container_name: grafana
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards
+    env_file:
+      - .env
+    ports:
+      - 127.0.0.1:3000:3000
+    restart: unless-stopped
+    networks:
+      - monitoring
+    depends_on:
+      - loki
+
+  loki:
+    image: grafana/loki:3.0.0
+    container_name: loki
+    volumes:
+      - ./monitoring/loki/config.yml:/etc/loki/config.yml
+    restart: unless-stopped
+    networks:
+      - monitoring
+
+  promtail:
+    image: grafana/promtail:3.0.0
+    container_name: promtail
+    volumes:
+      - ./monitoring/promtail/config.yml:/etc/promtail/config.yml
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: -config.file=/etc/promtail/config.yml
+    restart: unless-stopped
+    networks:
+      - monitoring
+      - app-monitoring
+    depends_on:
+      - loki
+
+networks:
+  monitoring:
+    name: monitoring
+    driver: bridge
+  app-monitoring:
+    name: app-monitoring
+    driver: bridge
+
+volumes:
+  grafana_data:
